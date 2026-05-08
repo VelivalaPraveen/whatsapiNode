@@ -8,7 +8,7 @@ const app = express().use(body_parser.json());
 
 const access_token = "EAAXf9ZBpmgnsBRXXyoZBvoKpP7FRDTeeKKcC1fd0OKhYLhrDrnUwmLZAZBT9ZAfZAQUmasyedEX6MtUCS49Ko4DRMSlNJYlNAzoln3SJ0PQ3iyiFBZANZBSC0Ni9MItACTjRVtZAoeCHGAljCCr4ZAxHlB2TZCGV20HXPkQXrFtvxZBq1ZBvTS1ywZCJwQ4WLV8LBfsAZDZD";
 const verify_token = "myverifytoken";
-const phone_number_id = 995088830364602;
+const phone_number_id = 1140099032500596;
 
 
 
@@ -28,7 +28,6 @@ app.listen(3000||process.env.PORT  , () => {
 // ======================================================
 
 app.get("/", (req, res) => {
-
     res.send("WhatsApp Cloud API Running...");
 });
 
@@ -122,6 +121,26 @@ app.post("/webhook", async (req, res) => {
 
 
 
+        // =========================================
+        // TEMPLATE DELIVERY STATUS
+        // =========================================
+
+        const statuses =
+            body_param?.entry?.[0]
+            ?.changes?.[0]
+            ?.value?.statuses;
+
+        if (statuses) {
+
+            console.log("========== TEMPLATE STATUS ==========");
+
+            console.log(
+                JSON.stringify(statuses, null, 2)
+            );
+        }
+
+
+
         // BODY VALIDATION
         if (!body_param) {
 
@@ -154,9 +173,9 @@ app.post("/webhook", async (req, res) => {
 
         if (!message) {
 
-            return res.status(404).json({
-                success: false,
-                message: "No message found"
+            return res.status(200).json({
+                success: true,
+                message: "Status webhook received"
             });
         }
 
@@ -203,45 +222,133 @@ async function sendTextMessage(to, message) {
 
     try {
 
-        let response = await axios({
+        // =========================================
+        // PAYLOAD
+        // =========================================
 
-            method: "POST",
+        const payload = {
 
-            url:
-                "https://graph.facebook.com/v25.0/" +
-                phone_number_id +
-                "/messages",
+            messaging_product: "whatsapp",
 
-            headers: {
-                Authorization: `Bearer ${access_token}`,
-                "Content-Type": "application/json",
-            },
+            to: String(to).trim(),
 
-            data: {
-                messaging_product: "whatsapp",
+            type: "text",
 
-                to: to,
+            text: {
+                body: String(message)
+            }
+        };
 
-                type: "text",
 
-                text: {
-                    body: message,
-                },
-            },
-        });
 
-        console.log("TEXT MESSAGE SENT");
-        console.log(response.data);
+        console.log("========== TEXT PAYLOAD ==========");
+
+        console.log(
+            JSON.stringify(payload, null, 2)
+        );
+
+
+
+        // =========================================
+        // SEND MESSAGE
+        // =========================================
+
+        const response = await axios.post(
+
+            `https://graph.facebook.com/v25.0/${phone_number_id}/messages`,
+
+            payload,
+
+            {
+                headers: {
+
+                    Authorization: `Bearer ${access_token}`,
+
+                    "Content-Type": "application/json"
+                }
+            }
+        );
+
+
+
+        // =========================================
+        // RESPONSE
+        // =========================================
+
+        console.log("========== TEXT RESPONSE ==========");
+
+        console.log(
+            JSON.stringify(
+                response.data,
+                null,
+                2
+            )
+        );
+
+
+
+        // =========================================
+        // MESSAGE DETAILS
+        // =========================================
+
+        const message_id =
+            response.data?.messages?.[0]?.id;
+
+        const message_status =
+            response.data?.messages?.[0]?.message_status;
+
+
+
+        console.log("MESSAGE ID :", message_id);
+
+        console.log("MESSAGE STATUS :", message_status);
+
+
+
+        // =========================================
+        // RETURN
+        // =========================================
+
+        return {
+
+            success: true,
+
+            message_id: message_id,
+
+            message_status: message_status,
+
+            data: response.data
+        };
 
     } catch (error) {
 
-        console.log("TEXT MESSAGE ERROR");
+        console.log("========== TEXT ERROR ==========");
 
         if (error.response) {
-            console.log(error.response.data);
+
+            console.log(
+                JSON.stringify(
+                    error.response.data,
+                    null,
+                    2
+                )
+            );
+
         } else {
+
             console.log(error.message);
         }
+
+
+
+        return {
+
+            success: false,
+
+            error:
+                error.response?.data ||
+                error.message
+        };
     }
 }
 
@@ -251,62 +358,141 @@ async function sendTextMessage(to, message) {
 // SEND TEMPLATE MESSAGE
 // ======================================================
 
-async function sendTemplateMessage(to, template_name, language_code = "en_US") {
+// async function sendTemplateMessage(to, template_name, language_code) {
+
+//     try {
+
+//         let response = await axios({
+
+//             method: "POST",
+
+//             url:
+//                 "https://graph.facebook.com/v25.0/" +
+//                 phone_number_id +
+//                 "/messages",
+
+//             headers: {
+//                 Authorization: `Bearer ${access_token}`,
+//                 "Content-Type": "application/json",
+//             },
+
+//             data: {
+
+//                 messaging_product: "whatsapp",
+
+//                 to: to,
+
+//                 type: "template",
+
+//                 template: {
+
+//                     name: template_name,
+
+//                     language: {
+//                         code: language_code || "en",
+//                     },
+//                 },
+//             },
+//         });
+
+//         return response.data;
+
+//     } catch (error) {
+
+//         console.log(error.response?.data || error.message);
+
+//         throw error;
+//     }
+// }
+
+
+async function sendTemplateMessage(
+    to,
+    template_name,
+    language_code
+) {
 
     try {
 
-        let response = await axios({
+        // DEFAULT LANGUAGE
+        language_code = language_code || "en";
 
-            method: "POST",
 
-            url:
-                "https://graph.facebook.com/v25.0/" +
-                phone_number_id +
-                "/messages",
 
-            headers: {
-                Authorization: `Bearer ${access_token}`,
-                "Content-Type": "application/json",
-            },
+        // PAYLOAD
+        const payload = {
 
-            data: {
+            messaging_product: "whatsapp",
 
-                messaging_product: "whatsapp",
+            to: String(to).trim(),
 
-                to: to,
+            type: "template",
 
-                type: "template",
+            template: {
 
-                template: {
+                name: String(template_name).trim(),
 
-                    name: template_name,
+                language: {
+                    code: String(language_code).trim()
+                }
+            }
+        };
 
-                    language: {
-                        code: language_code,
-                    },
-                },
-            },
-        });
 
-        console.log("TEMPLATE MESSAGE SENT");
+
+        console.log("========== PAYLOAD ==========");
+        console.log(JSON.stringify(payload, null, 2));
+
+
+
+        // API CALL
+        const response = await axios.post(
+
+            `https://graph.facebook.com/v25.0/${phone_number_id}/messages`,
+
+            payload,
+
+            {
+                headers: {
+
+                    Authorization: `Bearer ${access_token}`,
+
+                    "Content-Type": "application/json"
+                }
+            }
+        );
+
+
+
+        console.log("========== SUCCESS ==========");
         console.log(response.data);
+
+
 
         return response.data;
 
     } catch (error) {
 
-        console.log("TEMPLATE ERROR");
+        console.log("========== ERROR ==========");
 
         if (error.response) {
-            console.log(error.response.data);
+
+            console.log(
+                JSON.stringify(
+                    error.response.data,
+                    null,
+                    2
+                )
+            );
+
         } else {
+
             console.log(error.message);
         }
 
         throw error;
     }
 }
-
 
 
 // ======================================================
@@ -365,6 +551,42 @@ app.post("/send-text", async (req, res) => {
 // API TO SEND TEMPLATE MESSAGE
 // ======================================================
 
+// app.post("/send-template", async (req, res) => {
+
+//     try {
+
+//         const {
+//             user_number,
+//             template_name,
+//             language_code
+//         } = req.body;
+
+//         if (!user_number || !template_name) {
+
+//             return res.status(400).json({
+//                 error: "user_number and template_name are required"
+//             });
+//         }
+
+//         let response = await sendTemplateMessage(
+//             user_number,
+//             template_name,
+//             language_code
+//         );
+
+//         res.status(200).json({
+//             success: true,
+//             data: response
+//         });
+
+//     } catch (error) {
+
+//         res.status(500).json({
+//             success: false,
+//             error: error.response?.data || error.message
+//         });
+//     }
+// });
 app.post("/send-template", async (req, res) => {
 
     try {
@@ -375,18 +597,15 @@ app.post("/send-template", async (req, res) => {
             language_code
         } = req.body;
 
-        if (!user_number || !template_name) {
 
-            return res.status(400).json({
-                error: "user_number and template_name are required"
-            });
-        }
 
-        let response = await sendTemplateMessage(
+        const response = await sendTemplateMessage(
             user_number,
             template_name,
             language_code
         );
+
+
 
         res.status(200).json({
             success: true,
